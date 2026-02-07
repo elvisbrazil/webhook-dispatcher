@@ -1,8 +1,12 @@
 import { buildApp } from "./app.js";
 import { loadConfig } from "./config.js";
+import { createDatabase } from "./db/client.js";
 
 const config = loadConfig();
-const app = await buildApp({ logger: { level: config.LOG_LEVEL } });
+const database = createDatabase(config.DATABASE_URL);
+const app = await buildApp({ db: database.db, logger: { level: config.LOG_LEVEL } });
+
+app.addHook("onClose", () => database.close());
 
 const shutdown = async (signal: string) => {
   app.log.info({ signal }, "shutting down");
