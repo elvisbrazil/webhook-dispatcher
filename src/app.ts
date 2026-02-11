@@ -5,6 +5,8 @@ import {
   type ZodTypeProvider,
 } from "fastify-type-provider-zod";
 import type { Database } from "./db/client.js";
+import { errorHandler } from "./errors.js";
+import { endpointRoutes } from "./modules/endpoints/routes.js";
 import { tenantAuth } from "./plugins/auth.js";
 
 export type AppOptions = {
@@ -17,11 +19,13 @@ export async function buildApp({ db, logger = false }: AppOptions) {
 
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
+  app.setErrorHandler(errorHandler);
 
   app.get("/health", async () => ({ status: "ok" }));
 
   await app.register(async (api) => {
     await api.register(tenantAuth, { db });
+    await api.register(endpointRoutes, { db });
   });
 
   return app;
