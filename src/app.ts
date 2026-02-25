@@ -7,14 +7,17 @@ import {
 import type { Database } from "./db/client.js";
 import { errorHandler } from "./errors.js";
 import { endpointRoutes } from "./modules/endpoints/routes.js";
+import { eventRoutes } from "./modules/events/routes.js";
 import { tenantAuth } from "./plugins/auth.js";
+import type { DeliveryQueue } from "./queue/port.js";
 
 export type AppOptions = {
   db: Database;
+  queue: DeliveryQueue;
   logger?: FastifyServerOptions["logger"];
 };
 
-export async function buildApp({ db, logger = false }: AppOptions) {
+export async function buildApp({ db, queue, logger = false }: AppOptions) {
   const app = Fastify({ logger }).withTypeProvider<ZodTypeProvider>();
 
   app.setValidatorCompiler(validatorCompiler);
@@ -26,6 +29,7 @@ export async function buildApp({ db, logger = false }: AppOptions) {
   await app.register(async (api) => {
     await api.register(tenantAuth, { db });
     await api.register(endpointRoutes, { db });
+    await api.register(eventRoutes, { db, queue });
   });
 
   return app;
