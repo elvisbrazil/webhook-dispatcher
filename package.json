@@ -27,6 +27,7 @@
     "fastify-type-provider-zod": "6.1.0",
     "ioredis": "5.9.2",
     "pg": "8.18.0",
+    "undici": "7.19.2",
     "zod": "4.3.6"
   },
   "devDependencies": {
