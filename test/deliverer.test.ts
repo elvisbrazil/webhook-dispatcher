@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { MockAgent } from "undici";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Database } from "../src/db/client.js";
-import { deliveries, deliveryAttempts } from "../src/db/schema.js";
+import { deliveries, deliveryAttempts, endpoints } from "../src/db/schema.js";
 import type { Endpoint } from "../src/modules/endpoints/repository.js";
 import { publishEvent } from "../src/modules/events/service.js";
 import { createTenant } from "../src/modules/tenants/repository.js";
@@ -39,6 +39,7 @@ describe("deliverer", () => {
       queue,
       policy,
       timeoutMs: 100,
+      disableAfter: 3,
       dispatcher: agent,
       random: () => 1,
     });
@@ -151,5 +152,54 @@ describe("deliverer", () => {
     await deliverer.deliver(job.deliveryId);
 
     expect(await deliverer.deliver(job.deliveryId)).toEqual({ action: "skipped" });
+  });
+
+  describe("auto-disable", () => {
+    const loadEndpoint = async () =>
+      (await db.select().from(endpoints).where(eq(endpoints.id, target.id)))[0]!;
+
+    const failOnce = async () => {
+      await publishEvent(db, queue, target.tenantId, { type: "order.created", payload: {} });
+      intercept().reply(400, "bad");
+      for (const job of queue.take()) {
+        await deliverer.deliver(job.deliveryId);
+      }
+    };
+
+    it("disables the endpoint after consecutive failed deliveries", async () => {
+      queue.take();
+      await failOnce();
+      await failOnce();
+      expect(await loadEndpoint()).toMatchObject({ enabled: true, consecutiveFailures: 2 });
+
+      await failOnce();
+      expect(await loadEndpoint()).toMatchObject({
+        enabled: false,
+        consecutiveFailures: 3,
+        disabledReason: "disabled after 3 consecutive failed deliveries",
+      });
+    });
+
+    it("resets the failure counter after a success", async () => {
+      queue.take();
+      await failOnce();
+      await failOnce();
+
+      await publishEvent(db, queue, target.tenantId, { type: "order.created", payload: {} });
+      intercept().reply(200, "ok");
+      await deliverer.deliver(nextJob().deliveryId);
+
+      expect(await loadEndpoint()).toMatchObject({ enabled: true, consecutiveFailures: 0 });
+    });
+
+    it("fails pending deliveries of a disabled endpoint without calling it", async () => {
+      const job = nextJob();
+      await db.update(endpoints).set({ enabled: false }).where(eq(endpoints.id, target.id));
+
+      const outcome = await deliverer.deliver(job.deliveryId);
+
+      expect(outcome).toEqual({ action: "fail", reason: "endpoint disabled" });
+      expect(await loadAttempts(job.deliveryId)).toHaveLength(0);
+    });
   });
 });

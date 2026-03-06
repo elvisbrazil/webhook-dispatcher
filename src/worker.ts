@@ -17,6 +17,7 @@ const deliverer = createDeliverer({
   db: database.db,
   queue,
   timeoutMs: config.DELIVERY_TIMEOUT_MS,
+  disableAfter: config.AUTO_DISABLE_AFTER,
   policy: {
     maxAttempts: config.DELIVERY_MAX_ATTEMPTS,
     baseDelayMs: config.BACKOFF_BASE_MS,

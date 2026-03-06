@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { request, type Dispatcher } from "undici";
 import type { Database } from "../db/client.js";
 import { deliveries, deliveryAttempts, endpoints, events } from "../db/schema.js";
@@ -11,6 +11,7 @@ export type DelivererOptions = {
   queue: DeliveryQueue;
   policy: RetryPolicy;
   timeoutMs: number;
+  disableAfter: number;
   dispatcher?: Dispatcher;
   now?: () => Date;
   random?: () => number;
@@ -25,6 +26,7 @@ export function createDeliverer({
   queue,
   policy,
   timeoutMs,
+  disableAfter,
   dispatcher,
   now = () => new Date(),
   random = Math.random,
@@ -120,6 +122,34 @@ export function createDeliverer({
         error: result.kind === "error" ? result.message : null,
         durationMs,
       });
+
+      if (decision.action === "succeed") {
+        await tx
+          .update(endpoints)
+          .set({ consecutiveFailures: 0 })
+          .where(eq(endpoints.id, endpoint.id));
+      }
+
+      if (decision.action === "fail") {
+        await tx
+          .update(endpoints)
+          .set({ consecutiveFailures: sql`${endpoints.consecutiveFailures} + 1` })
+          .where(eq(endpoints.id, endpoint.id));
+        await tx
+          .update(endpoints)
+          .set({
+            enabled: false,
+            disabledReason: `disabled after ${disableAfter} consecutive failed deliveries`,
+          })
+          .where(
+            and(
+              eq(endpoints.id, endpoint.id),
+              eq(endpoints.enabled, true),
+              sql`${endpoints.consecutiveFailures} >= ${disableAfter}`,
+            ),
+          );
+      }
+
       return true;
     });
 

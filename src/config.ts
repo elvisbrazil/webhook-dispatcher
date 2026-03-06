@@ -11,6 +11,7 @@ const schema = z.object({
   DELIVERY_MAX_ATTEMPTS: z.coerce.number().int().positive().default(8),
   BACKOFF_BASE_MS: z.coerce.number().int().positive().default(5_000),
   BACKOFF_MAX_MS: z.coerce.number().int().positive().default(3_600_000),
+  AUTO_DISABLE_AFTER: z.coerce.number().int().positive().default(20),
   WORKER_CONCURRENCY: z.coerce.number().int().positive().default(10),
 });
 
