@@ -6,6 +6,7 @@ import {
 } from "fastify-type-provider-zod";
 import type { Database } from "./db/client.js";
 import { errorHandler } from "./errors.js";
+import { deliveryRoutes } from "./modules/deliveries/routes.js";
 import { endpointRoutes } from "./modules/endpoints/routes.js";
 import { eventRoutes } from "./modules/events/routes.js";
 import { tenantAuth } from "./plugins/auth.js";
@@ -30,6 +31,7 @@ export async function buildApp({ db, queue, logger = false }: AppOptions) {
     await api.register(tenantAuth, { db });
     await api.register(endpointRoutes, { db });
     await api.register(eventRoutes, { db, queue });
+    await api.register(deliveryRoutes, { db, queue });
   });
 
   return app;
