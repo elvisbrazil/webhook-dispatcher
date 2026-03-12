@@ -65,6 +65,17 @@ describe("decide", () => {
     expect(decision).toEqual({ action: "retry", delayMs: 30_000, reason: "HTTP 429" });
   });
 
+  it("accepts Retry-After as an HTTP date", () => {
+    const now = new Date("2026-03-12T09:00:00Z");
+    const decision = decide(
+      { kind: "response", status: 503, retryAfter: "Thu, 12 Mar 2026 09:00:45 GMT" },
+      1,
+      policy,
+      { now },
+    );
+    expect(decision).toMatchObject({ action: "retry", delayMs: 45_000 });
+  });
+
   it("caps Retry-After at the max delay", () => {
     const decision = decide({ kind: "response", status: 429, retryAfter: "3600" }, 1, policy);
     expect(decision).toMatchObject({ delayMs: 60_000 });

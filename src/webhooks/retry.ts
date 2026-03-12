@@ -27,16 +27,21 @@ export function backoffDelay(attempt: number, policy: RetryPolicy, random = Math
   return Math.round(ceiling / 2 + (random() * ceiling) / 2);
 }
 
-export function parseRetryAfter(value: string | undefined) {
-  if (!value || !/^\d+$/.test(value.trim())) return undefined;
-  return Number(value.trim()) * 1000;
+export function parseRetryAfter(value: string | undefined, now = new Date()) {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  if (/^\d+$/.test(trimmed)) return Number(trimmed) * 1000;
+
+  const date = Date.parse(trimmed);
+  if (Number.isNaN(date)) return undefined;
+  return Math.max(0, date - now.getTime());
 }
 
 export function decide(
   result: AttemptResult,
   attempt: number,
   policy: RetryPolicy,
-  { random = Math.random }: DecideOptions = {},
+  { now = new Date(), random = Math.random }: DecideOptions = {},
 ): Decision {
   if (result.kind === "response" && result.status >= 200 && result.status < 300) {
     return { action: "succeed" };
@@ -54,7 +59,7 @@ export function decide(
 
   const retryAfter =
     result.kind === "response" && (result.status === 429 || result.status === 503)
-      ? parseRetryAfter(result.retryAfter)
+      ? parseRetryAfter(result.retryAfter, now)
       : undefined;
 
   const delayMs =
