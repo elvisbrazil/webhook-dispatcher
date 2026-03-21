@@ -1,5 +1,8 @@
+import swagger from "@fastify/swagger";
+import swaggerUi from "@fastify/swagger-ui";
 import Fastify, { type FastifyServerOptions } from "fastify";
 import {
+  jsonSchemaTransform,
   serializerCompiler,
   validatorCompiler,
   type ZodTypeProvider,
@@ -9,7 +12,7 @@ import { errorHandler } from "./errors.js";
 import { deliveryRoutes } from "./modules/deliveries/routes.js";
 import { endpointRoutes } from "./modules/endpoints/routes.js";
 import { eventRoutes } from "./modules/events/routes.js";
-import { tenantAuth } from "./plugins/auth.js";
+import { API_KEY_HEADER, tenantAuth } from "./plugins/auth.js";
 import type { DeliveryQueue } from "./queue/port.js";
 
 export type AppOptions = {
@@ -25,7 +28,21 @@ export async function buildApp({ db, queue, logger = false }: AppOptions) {
   app.setSerializerCompiler(serializerCompiler);
   app.setErrorHandler(errorHandler);
 
-  app.get("/health", async () => ({ status: "ok" }));
+  await app.register(swagger, {
+    openapi: {
+      info: { title: "webhook-dispatcher", version: "0.1.0" },
+      components: {
+        securitySchemes: {
+          apiKey: { type: "apiKey", in: "header", name: API_KEY_HEADER },
+        },
+      },
+      security: [{ apiKey: [] }],
+    },
+    transform: jsonSchemaTransform,
+  });
+  await app.register(swaggerUi, { routePrefix: "/docs" });
+
+  app.get("/health", { schema: { hide: true } }, async () => ({ status: "ok" }));
 
   await app.register(async (api) => {
     await api.register(tenantAuth, { db });

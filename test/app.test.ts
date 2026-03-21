@@ -15,4 +15,12 @@ describe("app", () => {
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ status: "ok" });
   });
+
+  it("publishes the openapi document", async () => {
+    const res = await ctx.app.inject({ method: "GET", url: "/docs/json" });
+    expect(res.statusCode).toBe(200);
+    const paths = Object.keys(res.json().paths);
+    expect(paths).toEqual(expect.arrayContaining(["/endpoints", "/events"]));
+    expect(paths).not.toContain("/health");
+  });
 });
