@@ -27,6 +27,10 @@ pnpm test
 
 `docker compose --profile app up -d --build` also runs the api and the worker in containers.
 
+Delivery behaviour is tuned through env vars (see `.env.example`): `DELIVERY_TIMEOUT_MS`,
+`DELIVERY_MAX_ATTEMPTS`, `BACKOFF_BASE_MS`, `BACKOFF_MAX_MS`, `AUTO_DISABLE_AFTER` and
+`WORKER_CONCURRENCY`.
+
 ## API
 
 All routes except `/health` and `/docs` need the tenant key in `x-api-key`.
